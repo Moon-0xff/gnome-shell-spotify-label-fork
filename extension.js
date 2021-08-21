@@ -52,22 +52,32 @@ const SpotifyLabel = new Lang.Class({
 		this._timeout = Mainloop.timeout_add_seconds(REFRESH_RATE, Lang.bind(this, this._refresh));
 		return true;
 	},
-	
-	_loadData: function () {
-		
+
+	_cliSpawn: function (command) {
 		let [res, out, err, status] = [];
 		try {
-			//Use GLib to send a dbus request with the expectation of receiving an MPRIS v2 response.
-			[res, out, err, status] = GLib.spawn_command_line_sync("dbus-send --print-reply --dest=org.mpris.MediaPlayer2.spotify /org/mpris/MediaPlayer2 org.freedesktop.DBus.Properties.Get string:org.mpris.MediaPlayer2.Player string:Metadata");
+			[res, out, err, status] = GLib.spawn_command_line_sync(command);
 		}
 		catch(err) {
 			this._refreshUI("Error. Please check system logs.");
 			global.log("spotifylabel: res: " + res + " -- status: " + status + " -- err:" + err);
 			return;
 		}
-		
-		var labelstring = parseSpotifyData(out.toString());
-		this._refreshUI(labelstring);
+		out = out.toString();
+		return out;
+	},
+	
+	_loadData: function () {
+		var dBusList = this._cliSpawn("dbus-send --print-reply --dest=org.freedesktop.DBus  /org/freedesktop/DBus org.freedesktop.DBus.ListNames");
+		try{
+			var players = dBusList.match(/string \"org\.mpris\.MediaPlayer2.*(?=\"\n)/g);
+			var metadata = this._cliSpawn("dbus-send --print-reply --dest=" + players[0].substring(8) + " /org/mpris/MediaPlayer2 org.freedesktop.DBus.Properties.Get string:org.mpris.MediaPlayer2.Player string:Metadata");
+			var labelstring = parseSpotifyData(metadata);
+			this._refreshUI(labelstring);
+		}
+		catch{
+			this._refreshUI("");
+		}
 	},
 	
 	_refreshUI: function (data) {
