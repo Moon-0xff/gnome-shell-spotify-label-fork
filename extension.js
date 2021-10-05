@@ -7,6 +7,7 @@ const Clutter = imports.gi.Clutter;
 const PanelMenu = imports.ui.panelMenu;
 const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
+const ByteArray = imports.byteArray;
 
 //"User-defined" constants. If you've stumbled upon this extension, these values are the most likely you'd like to change.
 const LEFT_PADDING = 30;
@@ -53,36 +54,18 @@ const SpotifyLabel = new Lang.Class({
 		return true;
 	},
 
-	_cliSpawn: function (command) {
-		let [res, out, err, status] = [];
-		try {
-			[res, out, err, status] = GLib.spawn_command_line_sync(command);
-		}
-		catch(err) {
-			this._refreshUI("Error. Please check system logs.");
-			global.log("spotifylabel: res: " + res + " -- status: " + status + " -- err:" + err);
-			return;
-		}
-		out = out.toString();
-		return out;
-	},
-	
 	_loadData: function () {
-		var dBusList = this._cliSpawn("dbus-send --print-reply --dest=org.freedesktop.DBus  /org/freedesktop/DBus org.freedesktop.DBus.ListNames");
 		try{
-			var players = dBusList.match(/string \"org\.mpris\.MediaPlayer2.*(?=\"\n)/g);
-			var metadata = this._cliSpawn("dbus-send --print-reply --dest=" + players[0].substring(8) + " /org/mpris/MediaPlayer2 org.freedesktop.DBus.Properties.Get string:org.mpris.MediaPlayer2.Player string:Metadata");
-			var labelstring = parseSpotifyData(metadata);
+			var labelstring = loadData();
 			this._refreshUI(labelstring);
 		}
 		catch{
 			this._refreshUI("");
 		}
 	},
-	
+
 	_refreshUI: function (data) {
-		let txt = data.toString();
-		this.buttonText.set_text(txt);
+		this.buttonText.set_text(data);
 	},
 	
 	_removeTimeout: function () {
@@ -121,9 +104,29 @@ function disable() {
 	spMenu.destroy();
 }
 
-//Spotify uses MIPRIS v2, and as such the metadata fields are prefixed by 'xesam'
-//We use this info to set our limits,and assume the data is properly escaped within quotes.
-function parseSpotifyData(data) {
+function dBusRequest (command) {
+	let [res, out, err, status] = [];
+	try {
+		//Use GLib to send a dbus request with the expectation of receiving an MPRIS v2 response.
+		[res, out, err, status] = GLib.spawn_command_line_sync(command);
+	}
+	catch(err) {
+		global.log("spotifylabel: res: " + res + " -- status: " + status + " -- err:" + err);
+		return "Error. Please check system logs.";
+	}
+	out = ByteArray.toString(out);
+	return out;
+}
+
+function loadData(){
+	var dBusList = dBusRequest("dbus-send --print-reply --dest=org.freedesktop.DBus  /org/freedesktop/DBus org.freedesktop.DBus.ListNames");
+	var players = dBusList.match(/string \"org\.mpris\.MediaPlayer2.*(?=\"\n)/g);
+	var metadata = dBusRequest("dbus-send --print-reply --dest=" + players[0].substring(8) + " /org/mpris/MediaPlayer2 org.freedesktop.DBus.Properties.Get string:org.mpris.MediaPlayer2.Player string:Metadata");
+	var labelstring = parseMetadata(metadata);
+	return labelstring
+}
+
+function parseMetadata(data) {
 	if(!data)
 		return ""
 
