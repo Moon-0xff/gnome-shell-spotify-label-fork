@@ -160,6 +160,29 @@ function parseMetadataField(metadata,fieldText) {
 		data = data.substring(0, MAX_STRING_LENGTH);
 		data = data.substring(0, data.lastIndexOf(" ")) + "...";
 	}
-	
+
+	if(data.match(/Remaster/i))
+		data = removeRemasterText(data);
+
 	return data
+}
+
+function removeRemasterText(datastring) {
+	var matchedSubString = datastring.match(/\((.*?)\)/gi); //matches text between parentheses
+
+	if (!matchedSubString)
+		matchedSubString = datastring.match(/-(.*?)$/gi); //matches text between a hyphen(-) and the end of the string
+
+	if (!matchedSubString)
+		return datastring //returns <datastring> unaltered if both matches were not successful
+
+	if(!matchedSubString[0].match(/Remaster/i))
+		return datastring //returns <datastring> unaltered if our match doesn't contain 'remaster'
+
+	datastring = datastring.replace(matchedSubString[0],"");
+
+	if (datastring.charAt(datastring.length-1) == " ")
+		datastring = datastring.substring(0,datastring.length-1); 
+
+	return datastring
 }
