@@ -126,37 +126,40 @@ function loadData(){
 	return labelstring
 }
 
-function parseMetadata(data) {
-	if(!data)
+function parseMetadata(metadata) {
+	if(!metadata)
+		return ""
+	
+	var title = parseMetadataField(metadata,"xesam:title");
+	var artist = parseMetadataField(metadata,"xesam:artist");
+	var album = parseMetadataField(metadata,"xesam:album");
+
+	if( (title || artist || album) == "")
 		return ""
 
+	var labelstring = (artist + " | " + album + " | " + title);
+
+	return labelstring
+}
+
+function parseMetadataField(metadata,fieldText) {
 	var re = RegExp('string \".*(?=\"\n)');
 
-	var titleBlock = data.substring(data.indexOf("xesam:title"));
-	var title = titleBlock.match(re)[0].substring(8);
-
-	var artistBlock = data.substring(data.indexOf("xesam:artist"));
-	var artist = artistBlock.match(re)[0].substring(8);
-
-	if (title.includes("xesam") || artist.includes("xesam"))
-		return "Loading..."
-
+	var dataBlock = metadata.substring(metadata.indexOf(fieldText));
+	var data = dataBlock.match(re)[0].substring(8);
+	
+	if (data.includes("xesam:") || data.includes("mpris:"))
+		return ""
+	
 	//Replaces every instance of " | "
-	if(title.includes(" | "))
-		title = title.replace(/ \| /g, " / ");
-
-	if(artist.includes(" | "))
-		artist = artist.replace(/ \| /g," / ");
+	if(data.includes(" | "))
+		data = data.replace(/ \| /g, " / ");
 
 	//If the name of either string is too long, cut off and add '...'
-	if (artist.length > MAX_STRING_LENGTH){
-		artist = artist.substring(0, MAX_STRING_LENGTH);
-		artist = artist.substring(0, artist.lastIndexOf(" ")) + "...";
+	if (data.length > MAX_STRING_LENGTH){
+		data = data.substring(0, MAX_STRING_LENGTH);
+		data = data.substring(0, data.lastIndexOf(" ")) + "...";
 	}
-
-	if (title.length > MAX_STRING_LENGTH){
-		title = title.substring(0, MAX_STRING_LENGTH);
-		title = title.substring(0, title.lastIndexOf(" ")) + "...";
-	}
-	return (title + " | " + artist);
+	
+	return data
 }
